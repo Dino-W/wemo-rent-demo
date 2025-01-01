@@ -1,0 +1,44 @@
+version: '3.9'
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - '6379:6379'
+    networks:
+      - my_custom_network
+
+  db:
+    image: postgres:17
+    restart: always
+    # set shared memory limit when using docker-compose
+    shm_size: 1024mb
+    #volumes:
+    #  - type: tmpfs
+    #    target: /dev/shm
+    #    tmpfs:
+    #      size: 134217728 # 128*2^20 bytes = 128Mb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test123
+      POSTGRES_DB: wemo
+    ports:
+      - '5432:5432'
+    networks:
+      - my_custom_network
+
+  node_app:
+    build:
+      context: .
+    environment:
+      NODE_ENV: production
+    ports:
+      - 3000:3000
+    networks:
+      - my_custom_network
+    depends_on:
+      - db
+      - redis
+
+networks:
+  my_custom_network:
+    driver: bridge
