@@ -1,75 +1,98 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { RedisService } from 'src/database/redis/redis.service';
 import { PostgresqlService } from 'src/database/postgresql/postgresql.service';
+import { RentDao } from './rent.dao';
+import { SCOOTER_STATUS } from './enum/scooter.status.enum';
+import { RentScooterDto } from './dto/rentScooter.dto';
+import { ReturnScooterDto } from './dto/returnScooter.dto';
 
 @Injectable()
 export class RentService {
   constructor(
     private readonly redisService: RedisService,
     private readonly postgresqlService: PostgresqlService,
+    private readonly rentDao: RentDao,
   ) {}
 
-  async returnScooter() {
-    // 在rent找出目前使用者租借的車輛
-
-    const sqlResult = await this.postgresqlService.query(
-      `SELECT * FROM  wemo.users `,
-    );
-
-    await this.redisService.set('test', 'hello', 60);
-
-    return sqlResult;
-  }
-
-  async rentScooter() {
-    // Redis 鎖鍵
-    // const userLockKey = `rent:lock:user:${userId}`;
-    // const scooterLockKey = `rent:lock:scooter:${scooterId}`;
-    // 使用SETNX
-    // 嘗試加鎖
-    // const userLock = await this.databaseService.set(userLockKey, 'locked', 10);
-    // const scooterLock = await this.databaseService.set(scooterLockKey, 'locked', 10);
-    // if (!userLock || !scooterLock) {
-    //   throw new BadRequestException('Resource is locked by another operation.');
-    // }
-
+  /**
+   * @param req HTTP Request Body
+   * @description 租用機車
+   */
+  async rentScooter(req: RentScooterDto) {
+    const { userId, scooterId } = req;
+    const scooterLockKey = `rent:lock:scooter:${scooterId}`;
     try {
-      // 檢查使用者是否已有未結束的租借
-      const activeRentQuery = `
-        SELECT * FROM rents WHERE user_id = $1 AND end_time IS NULL
-      `;
-      //   const activeRent = await this.databaseService.query(activeRentQuery, [userId]);
-      //   if (activeRent.length > 0) {
-      //     throw new BadRequestException('User already has an active rent.');
-      //   }
+      // 檢查目前是否有人正在租借這台車
+      const checkScooter = await this.redisService.get(scooterLockKey);
+      if (checkScooter) {
+        console.log('this scooter is renting');
+        return;
+      }
 
-      // 檢查車輛是否可用
-      const scooterQuery = `
-        SELECT * FROM scooters WHERE id = $1 AND status = 'available'
-      `;
-      //   const scooter = await this.databaseService.query(scooterQuery, [scooterId]);
-      //   if (scooter.length === 0) {
-      //     throw new BadRequestException('Scooter is not available.');
-      //   }
+      // 設置 Redis 鎖鍵
+      await this.redisService.setex(scooterLockKey, userId, 30);
 
-      // 插入租借紀錄
-      const insertRentQuery = `
-        INSERT INTO rents (user_id, scooter_id, start_time)
-        VALUES ($1, $2, NOW())
-        RETURNING *
-      `;
-      //   const rent = await this.databaseService.query(insertRentQuery, [userId, scooterId]);
+      const client = await this.postgresqlService.startTransaction();
 
-      // 更新車輛狀態
-      const updateScooterQuery = `
-        UPDATE scooters SET status = 'rented' WHERE id = $1
-      `;
-      //   await this.databaseService.query(updateScooterQuery, [scooterId]);
+      // 寫入新的一筆資料進rent表
+      const insertResult = await this.rentDao.insertRentEvent(
+        userId,
+        scooterId,
+        client,
+      );
+
+      // 更新Scooter狀態為租用
+      const rentStatus = SCOOTER_STATUS.RENTED;
+      await this.rentDao.updateScooterStatus(scooterId, rentStatus, client);
+
+      await this.postgresqlService.commitTransaction(client);
+
+      // 將租借事件 ID 存入 Redis hash
+      const rentEventKey = `renting:scooters`;
+      const rentEventId = insertResult.rows[0].id;
+      await this.redisService.setHashData(rentEventKey, scooterId, rentEventId);
+
       return;
     } finally {
+      // catch TODO:
       // 解鎖
-      //   await this.databaseService.del(userLockKey);
-      //   await this.databaseService.del(scooterLockKey);
+      await this.redisService.del(scooterLockKey);
     }
+  }
+
+  /**
+   * @param req HTTP Request Body
+   * @description 還車
+   */
+  async returnScooter(req: ReturnScooterDto) {
+    const { scooterId, latitude, longitude } = req;
+
+    const rentEventKey = `renting:scooters`;
+    // 在redis找出目前使用者租借的車輛事件
+    const rentingEventId = await this.redisService.getHash(
+      rentEventKey,
+      scooterId,
+    );
+
+    const client = await this.postgresqlService.startTransaction();
+
+    // 更新Rent還車時間
+    await this.rentDao.updateRent(rentingEventId, client);
+
+    // 更新Scooter狀態 & 座標
+    const scooterStatus = SCOOTER_STATUS.AVAILABLE;
+    await this.rentDao.returnScooterStatus(
+      scooterStatus,
+      latitude,
+      longitude,
+      scooterId,
+      client,
+    );
+
+    await this.postgresqlService.commitTransaction(client);
+
+    // 移除redis
+    await this.redisService.deleteHashField(rentEventKey, scooterId);
+    return;
   }
 }
