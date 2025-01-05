@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { ConfigService } from 'src/common/config/config.service';
 
 @Injectable()
@@ -18,8 +18,8 @@ export class PostgresqlService {
     });
   }
 
-  // PostgreSQL 查詢方法
-  async query(sql: string, params: any[] = []): Promise<any> {
+  // 單個SQL COMMAND
+  async query(sql: string, params: any[] = []): Promise<object> {
     const client = await this.pgPool.connect();
 
     try {
@@ -28,6 +28,41 @@ export class PostgresqlService {
       return result.rows;
     } catch (error) {
       console.log('query error:', error);
+    } finally {
+      client.release();
+    }
+  }
+
+  // 開始 Transaction
+  async startTransaction(): Promise<PoolClient> {
+    try {
+      const client = await this.pgPool.connect();
+      await client.query('BEGIN');
+      return client;
+    } catch (error) {
+      console.log('connect error:', error);
+    }
+  }
+
+  // 提交 Transaction
+  async commitTransaction(client: PoolClient): Promise<void> {
+    try {
+      await client.query('COMMIT');
+    } catch (error) {
+      console.log('commit error:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // rollback Transaction
+  async rollbackTransaction(client: PoolClient): Promise<void> {
+    try {
+      await client.query('ROLLBACK');
+    } catch (error) {
+      console.log('rollback error:', error);
+      throw error;
     } finally {
       client.release();
     }
