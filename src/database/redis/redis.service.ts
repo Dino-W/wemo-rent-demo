@@ -26,11 +26,12 @@ export class RedisService {
     }
   }
 
-  async setex(key: string, value: any, ttl: number): Promise<void> {
+  async setnx(key: string, value: any, ttl: number): Promise<boolean> {
     try {
-      await this.redisClient.setex(key, ttl, value); // 使用 setex 設置過期時間
+      const result = await this.redisClient.set(key, value, 'EX', ttl, 'NX');
+      return result === 'OK';
     } catch (error) {
-      console.error(`Set key "${key}" with TTL failed:`, error);
+      return false;
     }
   }
 

@@ -22,17 +22,29 @@ export class RentService {
     const { userId, scooterId } = req;
     const scooterLockKey = `rent:lock:scooter:${scooterId}`;
     try {
-      // 檢查目前是否有人正在租借這台車
-      const checkScooter = await this.redisService.get(scooterLockKey);
-      if (checkScooter) {
+      // 使用NX當參數設置Redis鎖，如果 scooterLockKey已存在，則不設置並返回 false
+      const lockResult = await this.redisService.setnx(
+        scooterLockKey,
+        userId,
+        30,
+      );
+
+      if (!lockResult) {
         console.log('this scooter is renting');
-        return;
+        throw new Error('this scooter is renting');
       }
 
-      // 設置 Redis 鎖鍵
-      await this.redisService.setex(scooterLockKey, userId, 30);
-
       const client = await this.postgresqlService.startTransaction();
+      // 再次確保車子沒有被租用
+      const scooterStatus = await this.rentDao.getScooterInfo(
+        scooterId,
+        client,
+      );
+
+      if (scooterStatus.status !== SCOOTER_STATUS.AVAILABLE) {
+        console.log('this scooter has rented');
+        throw new Error('this scooter has rented');
+      }
 
       // 寫入新的一筆資料進rent表
       const insertResult = await this.rentDao.insertRentEvent(
