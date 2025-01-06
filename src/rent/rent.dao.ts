@@ -17,12 +17,31 @@ export class RentDao {
           WHERE user_id = $1
             AND end_time IS NULL
           LIMIT 1
-          ORDER BY id DESC    
+          ORDER BY id DESC;    
        `;
 
     const result = await this.postgresqlService.query(queryStr, [scooterId]);
 
     return result;
+  }
+
+  /**
+   * 取得車子目前狀態
+   * @param scooterId
+   * @param connection
+   * @return
+   */
+  async getScooterInfo(scooterId: number, connection): Promise<any> {
+    const queryStr = /* sql */ `
+              SELECT id AS id,
+                     status AS status
+              FROM wemo.scooter 
+              WHERE id = $1;   
+           `;
+
+    const result = await connection.query(queryStr, [scooterId]);
+
+    return result.rows[0];
   }
 
   /**
@@ -40,7 +59,7 @@ export class RentDao {
     const queryStr = /* sql */ `
           UPDATE wemo.scooter 
           SET status = $1
-          WHERE id = $2   
+          WHERE id = $2;   
            `;
 
     const result = await connection.query(queryStr, [status, scooterId]);
@@ -58,7 +77,7 @@ export class RentDao {
     const queryStr = /* sql */ `
           UPDATE wemo.rent 
           SET end_time = CURRENT_TIMESTAMP
-          WHERE id = $1   
+          WHERE id = $1;
                `;
 
     const result = await connection.query(queryStr, [rentId]);
@@ -90,7 +109,7 @@ export class RentDao {
             $2,
             CURRENT_TIMESTAMP
           )
-          RETURNING id                 
+          RETURNING id;                 
                `;
 
     const result = await connection.query(queryStr, [userId, scooterId]);
@@ -119,7 +138,7 @@ export class RentDao {
               SET status = $1,
                   latitude = $2,
                   longitude = $3                  
-              WHERE id = $4   
+              WHERE id = $4;   
                `;
 
     const result = await connection.query(queryStr, [
