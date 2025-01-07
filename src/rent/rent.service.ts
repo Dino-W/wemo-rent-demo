@@ -11,7 +11,7 @@ export class RentService {
   constructor(
     private readonly redisService: RedisService,
     private readonly postgresqlService: PostgresqlService,
-    private readonly rentDao: RentDao,
+    private readonly rentDao: RentDao
   ) {}
 
   /**
@@ -26,7 +26,7 @@ export class RentService {
       const lockResult = await this.redisService.setnx(
         scooterLockKey,
         userId,
-        30,
+        30
       );
 
       if (!lockResult) {
@@ -38,7 +38,7 @@ export class RentService {
       // 再次確保車子沒有被租用
       const scooterStatus = await this.rentDao.getScooterInfo(
         scooterId,
-        client,
+        client
       );
 
       if (scooterStatus.status !== SCOOTER_STATUS.AVAILABLE) {
@@ -50,7 +50,7 @@ export class RentService {
       const insertResult = await this.rentDao.insertRentEvent(
         userId,
         scooterId,
-        client,
+        client
       );
 
       // 更新Scooter狀態為租用
@@ -83,7 +83,7 @@ export class RentService {
     // 在redis找出目前使用者租借的車輛事件
     const rentingEventId = await this.redisService.getHash(
       rentEventKey,
-      scooterId,
+      scooterId
     );
 
     const client = await this.postgresqlService.startTransaction();
@@ -98,7 +98,7 @@ export class RentService {
       latitude,
       longitude,
       scooterId,
-      client,
+      client
     );
 
     await this.postgresqlService.commitTransaction(client);

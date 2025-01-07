@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, types } from 'pg';
 import { ConfigService } from 'src/common/config/config.service';
 
 @Injectable()
@@ -9,17 +9,24 @@ export class PostgresqlService {
   constructor(private readonly configService: ConfigService) {
     const pgConfig = this.configService.getDatabaseConfig();
 
+    // 部分回傳型態設定
+    types.setTypeParser(types.builtins.FLOAT8, (value) => parseFloat(value));
+    types.setTypeParser(types.builtins.NUMERIC, (value) => parseFloat(value));
+    types.setTypeParser(types.builtins.TIMESTAMP, (value) => value);
+    types.setTypeParser(types.builtins.DATE, (value) => value);
+    types.setTypeParser(types.builtins.BOOL, (value) => value === 't');
+
     this.pgPool = new Pool({
       host: pgConfig.host,
       port: pgConfig.port,
       user: pgConfig.user,
       password: pgConfig.password,
-      database: pgConfig.database,
+      database: pgConfig.database
     });
   }
 
   // 單個SQL COMMAND
-  async query(sql: string, params: any[] = []): Promise<object> {
+  async query(sql: string, params: any[] = []): Promise<any[]> {
     const client = await this.pgPool.connect();
 
     try {
