@@ -2,7 +2,7 @@ import {
   Injectable,
   NestInterceptor,
   ExecutionContext,
-  CallHandler,
+  CallHandler
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -17,8 +17,8 @@ export class ResponseFormatInterceptor implements NestInterceptor {
         statusCode: STATUS_CODES.SUCCESS,
         timestamp: new Date().toISOString(),
         path: request.url,
-        result: data || {},
-      })),
+        result: data || { message: 'Operation Success' }
+      }))
     );
   }
 }
