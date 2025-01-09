@@ -7,7 +7,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalInterceptors(
     new ResponseFormatInterceptor(),
-    new LoggingInterceptor(),
+    new LoggingInterceptor()
   );
 
   app.setGlobalPrefix('api');

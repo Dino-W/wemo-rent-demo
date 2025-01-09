@@ -26,7 +26,7 @@ export class PostgresqlService {
   }
 
   // 單個SQL COMMAND
-  async query(sql: string, params: any[] = []): Promise<any[]> {
+  async query(sql: string, params: any[]): Promise<any[]> {
     const client = await this.pgPool.connect();
 
     try {
@@ -58,8 +58,6 @@ export class PostgresqlService {
     } catch (error) {
       console.log('commit error:', error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 
@@ -70,8 +68,6 @@ export class PostgresqlService {
     } catch (error) {
       console.log('rollback error:', error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 }

@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { RedisService } from 'src/database/redis/redis.service';
 import { PostgresqlService } from 'src/database/postgresql/postgresql.service';
 import { RentDao } from './rent.dao';
 import { SCOOTER_STATUS } from './enum/scooter.status.enum';
 import { RentScooterDto } from './dto/rentScooter.dto';
 import { ReturnScooterDto } from './dto/returnScooter.dto';
+import { ERROR_MESSAGES } from 'src/common/constant/error-messages.constant';
 
 @Injectable()
 export class RentService {
@@ -21,20 +22,21 @@ export class RentService {
   async rentScooter(req: RentScooterDto) {
     const { userId, scooterId } = req;
     const scooterLockKey = `rent:lock:scooter:${scooterId}`;
-    try {
-      // 使用NX當參數設置Redis鎖，如果 scooterLockKey已存在，則不設置並返回 false
-      const lockResult = await this.redisService.setnx(
-        scooterLockKey,
-        userId,
-        30
+    // 使用NX當參數設置Redis鎖，如果 scooterLockKey已存在，則不設置並返回 false
+    const lockResult = await this.redisService.setnx(
+      scooterLockKey,
+      userId,
+      30
+    );
+
+    if (!lockResult) {
+      throw new HttpException(
+        ERROR_MESSAGES.SCOOTER_STATUS_RENTING,
+        HttpStatus.BAD_REQUEST
       );
-
-      if (!lockResult) {
-        console.log('this scooter is renting');
-        throw new Error('this scooter is renting');
-      }
-
-      const client = await this.postgresqlService.startTransaction();
+    }
+    const client = await this.postgresqlService.startTransaction();
+    try {
       // 再次確保車子沒有被租用
       const scooterStatus = await this.rentDao.getScooterInfo(
         scooterId,
@@ -42,8 +44,10 @@ export class RentService {
       );
 
       if (scooterStatus.status !== SCOOTER_STATUS.AVAILABLE) {
-        console.log('this scooter has rented');
-        throw new Error('this scooter has rented');
+        throw new HttpException(
+          ERROR_MESSAGES.SCOOTER_STATUS_RENTED,
+          HttpStatus.BAD_REQUEST
+        );
       }
 
       // 寫入新的一筆資料進rent表
@@ -56,7 +60,6 @@ export class RentService {
       // 更新Scooter狀態為租用
       const rentStatus = SCOOTER_STATUS.RENTED;
       await this.rentDao.updateScooterStatus(scooterId, rentStatus, client);
-
       await this.postgresqlService.commitTransaction(client);
 
       // 將租借事件 ID 存入 Redis hash
@@ -65,8 +68,15 @@ export class RentService {
       await this.redisService.setHashData(rentEventKey, scooterId, rentEventId);
 
       return;
+    } catch (error) {
+      console.log('catch rentScooter error:', error);
+      if (client) {
+        await this.postgresqlService.rollbackTransaction(client);
+      }
     } finally {
-      // catch TODO:
+      if (client) {
+        client.release(); // 確保只有這裡釋放連線
+      }
       // 解鎖
       await this.redisService.del(scooterLockKey);
     }
@@ -85,26 +95,40 @@ export class RentService {
       rentEventKey,
       scooterId
     );
+    try {
+      // 確認車子是不是還在租用狀態
+      const checkResult = await this.rentDao.getScooterInfo(scooterId);
 
-    const client = await this.postgresqlService.startTransaction();
+      if (checkResult?.status !== SCOOTER_STATUS.RENTED) {
+        throw new HttpException(
+          ERROR_MESSAGES.SCOOTER_STATUS_ERROR,
+          HttpStatus.BAD_REQUEST
+        );
+      }
+      // TODO:確認車子是不是在還車範圍內
 
-    // 更新Rent還車時間
-    await this.rentDao.updateRent(rentingEventId, client);
+      const client = await this.postgresqlService.startTransaction();
 
-    // 更新Scooter狀態 & 座標
-    const scooterStatus = SCOOTER_STATUS.AVAILABLE;
-    await this.rentDao.returnScooterStatus(
-      scooterStatus,
-      latitude,
-      longitude,
-      scooterId,
-      client
-    );
+      // 更新Rent還車時間
+      await this.rentDao.updateRent(rentingEventId, client);
 
-    await this.postgresqlService.commitTransaction(client);
+      // 更新Scooter狀態 & 座標
+      const scooterStatus = SCOOTER_STATUS.AVAILABLE;
+      await this.rentDao.returnScooterStatus(
+        scooterStatus,
+        latitude,
+        longitude,
+        scooterId,
+        client
+      );
 
-    // 移除redis
-    await this.redisService.deleteHashField(rentEventKey, scooterId);
-    return;
+      await this.postgresqlService.commitTransaction(client);
+
+      // 移除redis
+      await this.redisService.deleteHashField(rentEventKey, scooterId);
+      return;
+    } catch (error) {
+      console.log('catch returnScooter error:', error);
+    }
   }
 }
