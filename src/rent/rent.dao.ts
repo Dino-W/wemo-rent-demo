@@ -31,17 +31,25 @@ export class RentDao {
    * @param connection
    * @return
    */
-  async getScooterInfo(scooterId: number, connection): Promise<any> {
+  async getScooterInfo(scooterId: number, connection?): Promise<any> {
     const queryStr = /* sql */ `
               SELECT id AS id,
                      status AS status
               FROM wemo.scooter 
-              WHERE id = $1;   
+              WHERE id = $1 FOR UPDATE;   
            `;
+    let result;
+    if (connection) {
+      const queryResult = await connection.query(queryStr, [scooterId]);
+      result = queryResult.rows[0];
+    } else {
+      const queryResult = await this.postgresqlService.query(queryStr, [
+        scooterId
+      ]);
+      result = queryResult[0];
+    }
 
-    const result = await connection.query(queryStr, [scooterId]);
-
-    return result.rows[0];
+    return result;
   }
 
   /**
@@ -54,7 +62,7 @@ export class RentDao {
   async updateScooterStatus(
     scooterId: number,
     status: string,
-    connection,
+    connection
   ): Promise<object> {
     const queryStr = /* sql */ `
           UPDATE wemo.scooter 
@@ -95,7 +103,7 @@ export class RentDao {
   async insertRentEvent(
     userId: number,
     scooterId: number,
-    connection,
+    connection
   ): Promise<any> {
     // const currentTime
     const queryStr = /* sql */ `
@@ -131,7 +139,7 @@ export class RentDao {
     latitude: number,
     longitude: number,
     scooterId: number,
-    connection,
+    connection
   ): Promise<object> {
     const queryStr = /* sql */ `
               UPDATE wemo.scooter 
@@ -145,7 +153,7 @@ export class RentDao {
       status,
       latitude,
       longitude,
-      scooterId,
+      scooterId
     ]);
 
     return result;

@@ -6,5 +6,7 @@ export const ERROR_MESSAGES = {
 
   /** Service */
   SCOOTER_STATUS_RENTING: 'This scooter is being rented',
-  SCOOTER_STATUS_RENTED: 'This scooter is already rented.'
+  SCOOTER_STATUS_RENTED: 'This scooter is already rented.',
+  SCOOTER_STATUS_ERROR:
+    'Scooter rental status is abnormal. Please contact customer support.'
 };

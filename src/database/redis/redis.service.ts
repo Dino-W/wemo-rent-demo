@@ -13,7 +13,7 @@ export class RedisService {
 
     this.redisClient = new Redis({
       host: redisConfig.host,
-      port: redisConfig.port,
+      port: redisConfig.port
     });
   }
 
@@ -47,12 +47,12 @@ export class RedisService {
 
   async tryLock(
     key: string,
-    ttl: number, // 過期時間（秒）
+    ttl: number // 過期時間（秒）
   ): Promise<string | null> {
     const lockId = uuidv4(); // 生成唯一標識
     const result = await (this.redisClient as any).set(key, lockId, {
       NX: true,
-      EX: ttl,
+      EX: ttl
     });
 
     if (result === 'OK') {
@@ -107,7 +107,7 @@ export class RedisService {
     key: string,
     field: string,
     value: string,
-    ttl?: number,
+    ttl?: number
   ) {
     try {
       await this.redisClient.hset(key, field, value);
