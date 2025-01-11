@@ -29,7 +29,5 @@
 **/secrets.dev.yaml
 **/values.dev.yaml
 **/build
-**/dist
-**/database
 LICENSE
 README.md
