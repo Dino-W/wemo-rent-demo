@@ -20,9 +20,9 @@ export class ScooterService {
    */
   async getScooterLocation(query: GetScooterLocationDto) {
     const { latitude, longitude } = query;
-    const queryReult: ScooterLocation[] =
+    const queryResult: ScooterLocation[] =
       await this.scooterDao.getScooterLocation(latitude, longitude);
 
-    return queryReult;
+    return queryResult;
   }
 }

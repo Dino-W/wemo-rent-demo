@@ -40,9 +40,30 @@ export class RedisService {
     return this.redisClient.get(key);
   }
 
-  // Redis 刪除鍵值
-  async del(key: string): Promise<number> {
-    return this.redisClient.del(key);
+  /**
+   * Redis 刪除鍵值
+   * @description 加入Lua腳本，確保在高併發情況下不會誤刪其他請求設置的鎖 & 保持原子性
+   */
+  async del(key: string, expectedValue: any): Promise<any> {
+    const unlockScript = `
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+      return redis.call("del", KEYS[1])
+    else
+      return 0
+    end
+  `;
+    try {
+      const result = await this.redisClient.eval(
+        unlockScript,
+        1,
+        key,
+        expectedValue
+      );
+      return result; // 返回 1 表示成功刪除，0 表示未刪除
+    } catch (error) {
+      console.error(`Failed to execute del for key: ${key}`, error);
+      return 0; // 返回 0 表示刪除失敗
+    }
   }
 
   async tryLock(
