@@ -73,12 +73,14 @@ export class RentService {
       if (client) {
         await this.postgresqlService.rollbackTransaction(client);
       }
+
+      throw error;
     } finally {
       if (client) {
         client.release(); // 確保只有這裡釋放連線
       }
       // 解鎖
-      await this.redisService.del(scooterLockKey);
+      await this.redisService.del(scooterLockKey, userId);
     }
   }
 
