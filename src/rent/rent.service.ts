@@ -144,6 +144,7 @@ export class RentService {
       return;
     } catch (error) {
       console.log('catch returnScooter error:', error);
+      throw error;
     }
   }
 }
