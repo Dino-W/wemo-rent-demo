@@ -6,6 +6,7 @@ import { SCOOTER_STATUS } from './enum/scooter.status.enum';
 import { RentScooterDto } from './dto/rentScooter.dto';
 import { ReturnScooterDto } from './dto/returnScooter.dto';
 import { ERROR_MESSAGES } from 'src/common/constant/error-messages.constant';
+import { getRentInfoDto } from './dto/getScooterInfo.dto';
 
 @Injectable()
 export class RentService {
@@ -14,6 +15,18 @@ export class RentService {
     private readonly postgresqlService: PostgresqlService,
     private readonly rentDao: RentDao
   ) {}
+
+  /**
+   * @param query
+   * @description 取得使用者租借紀錄
+   * @returns
+   */
+  async getRentInfo(query: getRentInfoDto) {
+    const { userId } = query;
+    const queryResult = await this.rentDao.getRentInfo(userId);
+
+    return queryResult;
+  }
 
   /**
    * @param req HTTP Request Body

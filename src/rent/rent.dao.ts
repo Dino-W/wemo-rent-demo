@@ -6,21 +6,29 @@ export class RentDao {
   constructor(private readonly postgresqlService: PostgresqlService) {}
 
   /**
-   * 取得目前租借紀錄
-   * @param scooterId
+   * 取得使用者租借紀錄(新到舊)
+   * @param userId
    * @return
    */
-  async getRentInfo(scooterId: number): Promise<object> {
+  async getRentInfo(userId: number): Promise<object> {
     const queryStr = /* sql */ `
-          SELECT id 
-          FROM wemo.rent 
-          WHERE user_id = $1
-            AND end_time IS NULL
-          LIMIT 1
-          ORDER BY id DESC;    
+          SELECT r.user_id AS userId,
+                 u.name AS userName, 
+                 r.scooter_id AS scooterId,
+                 s.model AS scooterModel,
+                 s.plate_number AS scooterPlateNumber,
+                 r.start_time AS startTime, 
+                 r.end_time AS endTime, 
+                 r.created_at AS createdAt, 
+                 r.updated_at AS updatedAt
+          FROM wemo.rent r
+          INNER JOIN wemo.users u ON u.id = r.user_id 
+          INNER JOIN wemo.scooter s ON s.id = r.scooter_id 
+          WHERE r.user_id = $1
+          ORDER BY r.id DESC;    
        `;
 
-    const result = await this.postgresqlService.query(queryStr, [scooterId]);
+    const result = await this.postgresqlService.query(queryStr, [userId]);
 
     return result;
   }
