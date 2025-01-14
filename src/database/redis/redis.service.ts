@@ -107,7 +107,8 @@ export class RedisService {
         await this.redisClient.expire(key, TTL);
       }
     } catch (error) {
-      // throw new CustomerException(configError._120001, HttpStatus.OK);
+      console.error('setHashData error:', error);
+      throw error;
     }
   }
 
