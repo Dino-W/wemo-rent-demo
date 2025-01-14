@@ -25,7 +25,7 @@ export class ScooterDao {
                    ST_DistanceSphere(ST_MakePoint(longitude, latitude), ST_MakePoint($1, $2)) AS distance
             FROM wemo.scooter
             WHERE status = $3
-              AND ST_DistanceSphere(ST_MakePoint(longitude, latitude), ST_MakePoint($1, $2)) <= 50000000;
+              AND ST_DistanceSphere(ST_MakePoint(longitude, latitude), ST_MakePoint($1, $2)) <= 5000;
            `;
 
     const result = await this.postgresqlService.query(queryStr, [
