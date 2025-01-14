@@ -73,12 +73,13 @@ export class RentService {
       // 更新Scooter狀態為租用
       const rentStatus = SCOOTER_STATUS.RENTED;
       await this.rentDao.updateScooterStatus(scooterId, rentStatus, client);
-      await this.postgresqlService.commitTransaction(client);
 
       // 將租借事件 ID 存入 Redis hash
       const rentEventKey = `renting:scooters`;
       const rentEventId = insertResult.rows[0].id;
       await this.redisService.setHashData(rentEventKey, scooterId, rentEventId);
+
+      await this.postgresqlService.commitTransaction(client);
 
       return;
     } catch (error) {
